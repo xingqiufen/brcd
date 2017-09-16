@@ -3,19 +3,11 @@ package com.brcd.controller;
 
 
 import com.brcd.bean.*;
-import com.brcd.bean.Bank;
-import com.brcd.bean.TbBankcardInfo;
-import com.brcd.bean.TbBusiness;
-import com.brcd.bean.TbBusinessUser;
-import com.brcd.common.util.Upload;
-import com.brcd.service.*;
-
 import com.brcd.common.util.ExportExcel;
-import com.brcd.service.BankService;
+import com.brcd.service.*;
 import com.github.pagehelper.PageHelper;
 import com.sun.deploy.net.URLEncoder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.propertyeditors.CustomDateEditor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -24,6 +16,7 @@ import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.ModelAndView;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
@@ -66,6 +59,8 @@ public class TbBusinessUserController {
      */
     @RequestMapping("/goToInsertBusinessUser")
     public String goToIsert(Model model,HttpSession session){
+        List<TbAreaDictionary> addrList = tbAreaDictionaryService.findByareaId();
+        model.addAttribute("provinceList",addrList);
         List<String> bankNameList = bankService.findBankName();
         model.addAttribute("bankNameList",bankNameList);
         TbAgent agentLogin = (TbAgent) session.getAttribute("agentLogin");
@@ -79,7 +74,7 @@ public class TbBusinessUserController {
     @RequestMapping("/insertBusinessUser")
     public String insertBusinessUser(TbBusinessUser tbBusinessUser, TbBusiness business, TbBankcardInfo bankcardInfo) {
         tbBusinessUserService.insertBusinessUser(tbBusinessUser, business, bankcardInfo);
-        return "redirect:/businessUser/query";
+        return "home/home";
     }
 
     /**
@@ -93,17 +88,18 @@ public class TbBusinessUserController {
     @RequestMapping("/query")
     public ModelAndView query(HttpServletRequest request,HttpSession session, TbBusinessUser tbBusinessUser, Integer currentPage) {
 
+        //共有多少条数据
         Integer listCount = tbBusinessUserService.query(tbBusinessUser).size();
 
         if(currentPage == null){
-            currentPage = 1;
+            currentPage = 1;//如果没有接收到页码的参数,就设置默认为0
         }
-        Integer pageSize =10;
+        Integer pageSize =10;//设置每页的条数
 
-        int pageCount =  listCount / pageSize + (listCount % pageSize != 0 ? 1 : 0);
+        int pageCount =  listCount / pageSize + (listCount % pageSize != 0 ? 1 : 0);//开始分页,计算总页码
 
-        PageHelper.startPage(currentPage, pageSize);
-        List<TbBusinessUser> query = tbBusinessUserService.query(tbBusinessUser);
+        PageHelper.startPage(currentPage, pageSize);//分页插件开始分页
+        List<TbBusinessUser> query = tbBusinessUserService.query(tbBusinessUser);//查询10条数据,想用于页面显示
         ModelAndView mv = new ModelAndView("menu/commercial/shanghuchaxun.html");
         mv.addObject("shangHu",query);
         mv.addObject("history",tbBusinessUser);
@@ -113,7 +109,9 @@ public class TbBusinessUserController {
         return mv;
     }
 
-
+    /*
+        导出到excel文档
+     */
     @RequestMapping("/exportExcel")
     public void exportExcel(TbBusinessUser tbBusinessUser, HttpServletRequest request, HttpServletResponse response)throws Exception{
 
@@ -141,6 +139,9 @@ public class TbBusinessUserController {
         ex.exportExcel(headers, list, out);
         out.close();
     }
+    /*
+        查询某一条数据的详细的信息
+     */
     @RequestMapping("/detail")
     public ModelAndView detail(String id){
         TbBusinessUser byBusinessUid = tbBusinessUserService.findByBusinessUid(id);
@@ -155,6 +156,8 @@ public class TbBusinessUserController {
         return mv;
     }
 
+
+
     @RequestMapping("toManage")
     public String shanghu(){ return "menu/commercial/shanghuxinxifguanli.html";}
 
@@ -164,8 +167,7 @@ public class TbBusinessUserController {
      * @return
      */
     @RequestMapping("toUpdate")
-
-    public String toUpdate(Model model ,Integer businessUid){
+    public String toUpdate(Model model ,String businessUid){
 
         List<TbAreaDictionary> addrList = tbAreaDictionaryService.findByareaId();
         model.addAttribute("provinceList",addrList);
@@ -231,18 +233,47 @@ public class TbBusinessUserController {
      */
     @RequestMapping("/goToBusinessLogin")
     public String goToBusinessLogin(){
-        return "/merchat/login";
+        return "merchat/login";
     }
 
     /**
      * 商户登录
      */
     @RequestMapping("/loginBusiness")
-    public String loginBusiness(TbBusinessUser tbBusinessUser){
-        boolean b = tbBusinessUserService.loginBusinessUser(tbBusinessUser);
-        if(b == true){
-            return "redirect:/wechat/scan_param";
+    public String loginBusiness(TbBusinessUser tbBusinessUser,HttpSession session, Model model){
+        System.err.println("------loginBusiness------"+tbBusinessUser);
+        if(tbBusinessUser != null){
+            TbBusinessUser BusinessUser = tbBusinessUserService.loginBusinessUser(tbBusinessUser);
+//           boolean exists = redisTemplate.hasKey("BusinessUser");
+            System.err.println("登录的用户----"+BusinessUser);
+            if (BusinessUser != null) {
+//               if (exists == true) {
+//                   TbBusinessUser BusinessUser1 = (TbBusinessUser) session.getAttribute("BusinessUser");
+//                    session.setAttribute("BusinessUser", BusinessUser1);
+//                } else {
+                session.setAttribute("BusinessUser", BusinessUser);
+//                }
+
+                return "merchat/shoukuan";
+            }
         }
+        model.addAttribute("errorMsg", "用户名或密码错误");
         return "/merchat/login";
     }
+
+    /**
+     * 验证手机号是否存在
+     */
+    @RequestMapping("/findBusinessUserBycontactPhone")
+    @ResponseBody
+    public String  findBusinessUserBycontactPhone(String contactPhone){
+        System.out.println("**************************************");
+        TbBusinessUser bycontactPhone = tbBusinessUserService.findBusinessUserBycontactPhone(contactPhone);
+        if(bycontactPhone != null){
+            System.out.println("1111111111111111111");
+            return "true";
+        }
+        return "false";
+    }
+
 }
